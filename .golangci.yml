@@ -1,0 +1,59 @@
+run:
+  modules-download-mode: vendor
+linters:
+  enable-all: false
+  enable:
+    # defaults
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - structcheck
+    - varcheck
+    # additional
+    - dupl
+    - gochecknoglobals
+    - gochecknoinits
+    - goconst
+    - gocyclo
+    - gofmt
+    - goimports
+    - golint
+    - interfacer
+    - lll
+    - nakedret
+    - unconvert
+  disable:
+    - deadcode
+    - unused
+linters-settings:
+  dupl:
+    threshold: 200
+  errcheck:
+    # Permit ignoring errors from everything in package "fmt", ioutil.Read*, and
+    # the "Close()" method of any object from package "os" (namely, os.File.Close(),
+    # which we usually call in a defer where handling the error doesn't make sense).
+    ignore: fmt:.*,io/ioutil:^Read.*,os:Close
+  gocyclo:
+    # This is actually "maximum complexity" before the linter starts complaining
+    # gocyclo checks cyclomatic complexity
+    min-complexity: 16
+  lll:
+    tab-width: 4
+    line-length: 120
+  nakedret:
+    # Naked returns are toxic for readability. If there's ever a _good_ reason
+    # we can adjust this number upwards, but it'd probably be more appropriate
+    # to just //nolint individual cases.
+    max-func-lines: 2
+issues:
+  # The default set of excludes omits some very valuable checks, presumably because
+  # most developers initially picking up golangci-lint just want to stop the bleeding
+  # in their codebases, not raise the bar.
+  # For production-quality code in a brand new codebase, our bar should be higher.
+  exclude-use-default: false
+  exclude-rules:
+    - linters:
+        - structcheck
+      text: "is unused"
