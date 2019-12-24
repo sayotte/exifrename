@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/rwcarlsen/goexif/exif"
@@ -34,10 +35,11 @@ func innerMain() error {
 			return fmt.Errorf("x.DateTime(): %s", err)
 		}
 
+		oldFileDir := filepath.Dir(filename)
 		oldFileDotParts := strings.Split(filename, ".")
 		oldFileSuffix := strings.ToLower(oldFileDotParts[len(oldFileDotParts)-1])
 		timestampFormatted := timeTaken.Format(timeFormat)
-		newFilename := fmt.Sprintf("%s.%s", timestampFormatted, oldFileSuffix)
+		newFilename := filepath.Join(oldFileDir, fmt.Sprintf("%s.%s", timestampFormatted, oldFileSuffix))
 		for iter := 1; ; {
 			if _, err := os.Stat(newFilename); !os.IsNotExist(err) {
 				newFilename = fmt.Sprintf("%s-%d.%s", timestampFormatted, iter, oldFileSuffix)
