@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,19 @@ import (
 )
 
 const timeFormat = "2006-01-02-15:04:05"
+
+func formattedExifTime(fd io.Reader) (string, error) {
+	x, err := exif.Decode(fd)
+	if err != nil {
+		return "", fmt.Errorf("file %q, exif.Decode(): %s", err)
+	}
+	timeTaken, err := x.DateTime()
+	if err != nil {
+		return "", fmt.Errorf("file %q, x.DateTime(): %s", err)
+	}
+
+	return timeTaken.Format(timeFormat), nil
+}
 
 func innerMain() error {
 	flag.Parse()
@@ -24,25 +38,23 @@ func innerMain() error {
 		if err != nil {
 			return fmt.Errorf("os.Open(%q): %s", filename, err)
 		}
-		x, err := exif.Decode(fd)
-		if err != nil {
-			return fmt.Errorf("exif.Decode(): %s", err)
-		}
-		_ = fd.Close()
-
-		timeTaken, err := x.DateTime()
-		if err != nil {
-			return fmt.Errorf("x.DateTime(): %s", err)
-		}
+		defer fd.Close()
 
 		oldFileDir := filepath.Dir(filename)
-		oldFileDotParts := strings.Split(filename, ".")
+		oldFileDotParts := strings.Split(filepath.Base(filename), ".")
 		oldFileSuffix := strings.ToLower(oldFileDotParts[len(oldFileDotParts)-1])
-		timestampFormatted := timeTaken.Format(timeFormat)
-		newFilename := filepath.Join(oldFileDir, fmt.Sprintf("%s.%s", timestampFormatted, oldFileSuffix))
+
+		var filenameBase string
+		filenameBase, err = formattedExifTime(fd)
+		if err != nil {
+			oldFilenameBase := strings.Join(oldFileDotParts[:len(oldFileDotParts)-1], ".")
+			filenameBase = "no-exif-" + oldFilenameBase
+		}
+
+		newFilename := filepath.Join(oldFileDir, fmt.Sprintf("%s.%s", filenameBase, oldFileSuffix))
 		for iter := 1; ; {
 			if _, err := os.Stat(newFilename); !os.IsNotExist(err) {
-				newFilename = fmt.Sprintf("%s-%d.%s", timestampFormatted, iter, oldFileSuffix)
+				newFilename = filepath.Join(oldFileDir, fmt.Sprintf("%s-%d.%s", filenameBase, iter, oldFileSuffix))
 			} else {
 				break
 			}
