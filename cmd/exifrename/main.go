@@ -47,11 +47,18 @@ func innerMain() error {
 		var filenameBase string
 		filenameBase, err = formattedExifTime(fd)
 		if err != nil {
+			if strings.HasPrefix(filepath.Base(filenameBase), "no-exif") {
+				continue
+			}
 			oldFilenameBase := strings.Join(oldFileDotParts[:len(oldFileDotParts)-1], ".")
 			filenameBase = "no-exif-" + oldFilenameBase
 		}
 
 		newFilename := filepath.Join(oldFileDir, fmt.Sprintf("%s.%s", filenameBase, oldFileSuffix))
+		if newFilename == filename {
+			continue
+		}
+
 		for iter := 1; ; {
 			if _, err := os.Stat(newFilename); !os.IsNotExist(err) {
 				newFilename = filepath.Join(oldFileDir, fmt.Sprintf("%s-%d.%s", filenameBase, iter, oldFileSuffix))
