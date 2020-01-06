@@ -1,9 +1,10 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
-	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,14 +14,24 @@ import (
 
 const timeFormat = "2006-01-02-15:04:05"
 
-func formattedExifTime(fd io.Reader) (string, error) {
+var recoverableExifReadError = errors.New("failed to read EXIF data; reason logged to console") // nolint
+
+func formattedExifTime(filename string) (string, error) {
+	fd, err := os.Open(filename)
+	if err != nil {
+		return "", fmt.Errorf("os.Open(%q): %s", filename, err)
+	}
+	defer func() { _ = fd.Close() }()
+
 	x, err := exif.Decode(fd)
 	if err != nil {
-		return "", fmt.Errorf("file %q, exif.Decode(): %s", err)
+		log.Printf("recoverable error on file %q, failed to read EXIF data, exif.Decode(): %s", filename, err)
+		return "", recoverableExifReadError
 	}
 	timeTaken, err := x.DateTime()
 	if err != nil {
-		return "", fmt.Errorf("file %q, x.DateTime(): %s", err)
+		log.Printf("recoverable error on file %q, failed to read EXIF data, exif.DateTime(): %s", filename, err)
+		return "", recoverableExifReadError
 	}
 
 	return timeTaken.Format(timeFormat), nil
@@ -34,19 +45,17 @@ func innerMain() error {
 	}
 
 	for _, filename := range flag.Args() {
-		fd, err := os.Open(filename)
-		if err != nil {
-			return fmt.Errorf("os.Open(%q): %s", filename, err)
-		}
-		defer fd.Close()
-
 		oldFileDir := filepath.Dir(filename)
 		oldFileDotParts := strings.Split(filepath.Base(filename), ".")
 		oldFileSuffix := strings.ToLower(oldFileDotParts[len(oldFileDotParts)-1])
 
 		var filenameBase string
-		filenameBase, err = formattedExifTime(fd)
+		filenameBase, err := formattedExifTime(filename)
 		if err != nil {
+			if err != recoverableExifReadError {
+				return err
+			}
+
 			if strings.HasPrefix(filepath.Base(filenameBase), "no-exif") {
 				continue
 			}
@@ -66,7 +75,7 @@ func innerMain() error {
 				break
 			}
 		}
-		fmt.Printf("%q -> %q\n", filename, newFilename)
+		log.Printf("%q -> %q\n", filename, newFilename)
 		err = os.Rename(filename, newFilename)
 		if err != nil {
 			return fmt.Errorf("os.Rename(%q, %q): %s", filename, newFilename, err)
@@ -77,10 +86,10 @@ func innerMain() error {
 }
 
 func main() {
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	err := innerMain()
 	if err != nil {
-		fmt.Printf("ERROR: %s\n", err)
-		os.Exit(1)
+		log.Fatalf("ERROR: %s", err)
 	}
 }
 
